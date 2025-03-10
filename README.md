@@ -1,4 +1,4 @@
-# PCC - Dimensionality reduction with high global structure preservation
+# PCC - Dimensionality reduction with very high global structure preservation
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Build Status](https://github.com/jacobgil/pcc/workflows/Tests/badge.svg)
@@ -11,7 +11,7 @@
 
 ⭐ This is a python package for dimensionality reduction (DR) with high global structure preservation.
 
-⭐ That means - the distances between transformed points, will actually mean anything.**
+⭐ That means that unlike in popular DR methods like UMAP, the distances between transformed points - will actually mean anything.**
 
 ⭐ Use PCUMAP for simply enhancing the widely used UMAP method with global structure preservation
 
@@ -31,7 +31,7 @@ There are two modes:
 
 ## Plugging into UMAP, for getting a meaningful transformation where distances between points mean something
 
-Here we use the excellent recent [TorchDR](https://github.com/TorchDR/TorchDR) library, and add our objective to UMAP.
+Here we use the excellent recent [TorchDR](https://github.com/TorchDR/TorchDR) library, and add plug in our objective into UMAP.
 
 ```python
 from pcc import PCUMAP
@@ -39,7 +39,7 @@ pcumap_embedding = PCUMAP(device='cuda').fit_transform(X)
 ```
 
 
-## PCC as a standalone DR method with high global structure preservation, and competitive local structure.
+## PCC as a standalone DR method with a multi task objective
 
 This optimizes a local structure preservation multi task objective that tries to predict which clusters points belong to,
 as well as global structure preservation loss that maximizes corerlations between distances of all points to sampled reference points.
