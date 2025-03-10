@@ -9,8 +9,9 @@
 `pip install pcc`
 
 
-This is a python package for dimensionality reduction (DR) with high global structure preservation.
-That means - the distances between transformed points, will actually mean anything.
+**This is a python package for dimensionality reduction (DR) with high global structure preservation.**
+
+**That means - the distances between transformed points, will actually mean anything.**
 
 
 *(For spearman correlation support, install [torchsort](https://github.com/teddykoker/torchsort) (`pip install torchsort`))*
@@ -24,7 +25,7 @@ See examples/macosko.ipynb for more detailed explanation and usage examples.
 
 There are two modes:
 
-## Plugging into UMAP
+## Plugging into UMAP, for getting a meaningful transformation where distances between points mean something
 
 Here we use the excellent recent [TorchDR](https://github.com/TorchDR/TorchDR) library, and add our objective to UMAP.
 
@@ -34,7 +35,7 @@ pcumap_embedding = PCUMAP(device='cuda').fit_transform(X)
 ```
 
 
-## PCC as a standalone DR method.
+## PCC as a standalone DR method with high global structure preservation, and competitive local structure.
 
 This optimizes a local structure preservation multi task objective that tries to predict which clusters points belong to,
 as well as global structure preservation loss that maximizes corerlations between distances of all points to sampled reference points.
