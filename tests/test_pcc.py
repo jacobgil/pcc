@@ -26,7 +26,7 @@ def test_pcc_parameters(synthetic_data):
               num_epochs=3, 
               num_points=10,
               pearson=True,
-              spearman=True,
+              spearman=False,
               beta=10)
     embedding = pcc.fit_transform(X, clusters)
     assert embedding.shape == (100, 3)

@@ -1,5 +1,4 @@
 import torch
-import torchsort
 from torchdr import UMAP
 import numpy as np
 import tqdm
@@ -216,6 +215,7 @@ class PCC:
         if (epoch % self.k_epoch == self.k_epoch - 1):
             correlation_loss = 0
             if self.spearman:
+                import torchsort
                 output_ranks = torchsort.soft_rank(
                     output_distances,
                     regularization_strength=self.regularization_strength)        
@@ -393,6 +393,7 @@ class PCUMAP(UMAP):
 
         correlation_loss = 0
         if self.spearman:
+            import torchsort
             output_ranks = torchsort.soft_rank(
                 output_distances,
                 regularization_strength=self.regularization_strength)
