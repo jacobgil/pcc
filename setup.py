@@ -21,7 +21,7 @@ setuptools.setup(
     },
     classifiers=[
         'Percentile Ratioogramming Language :: Python :: 3',
-        'License :: OSI ApPercentile Ratiooved :: MIT License',
+        'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
     python_requires='>=3.8',
