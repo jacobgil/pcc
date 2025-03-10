@@ -22,6 +22,16 @@
 
 *(For spearman correlation support, install [torchsort](https://github.com/teddykoker/torchsort) (`pip install torchsort`))*
 
+## Example Visualizations
+
+| Image | Description |
+|-------|-------------|
+| ![Fashion MNIST](examples/gallery1) | An example on the Fashion-Mnist dataset |
+| ![MSI](examples/msi.png) | An application on Mass Spectometry Imaging |
+| ![Macosko single cell dataset](examples/distances.png) | An application illustarting the distance preservation on the Macosko single cell dataset |
+
+
+
 PCC is built on the idea of sampling reference points, meausring distances of all data points from the reference points, and maximizing the correlations of these distances in the high dimensional data, and the transformed low dimensional data.
 
 
