@@ -5,8 +5,10 @@
 
 ![PCC](logo.png)
 
+(Authors: Jacob Gildenblat, Jens Pahnke)
 
 `pip install pccdr`
+
 
 
 ⭐ This is a python package for dimensionality reduction (DR) with high global structure preservation.
