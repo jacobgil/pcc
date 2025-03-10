@@ -6,7 +6,7 @@
 ![PCC](logo.png)
 
 
-`pip install pcc`
+`pip install pccdr`
 
 
 ⭐ This is a python package for dimensionality reduction (DR) with high global structure preservation.
