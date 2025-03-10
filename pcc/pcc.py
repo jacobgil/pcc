@@ -182,7 +182,7 @@ class PCC:
             Transformed data
         """
         self.initialize_embeddings(X, y)
-        print("Initialized embeddings")
+        
         for epoch in tqdm.tqdm(range(self.num_epochs)):
             output = self.compute_epoch(epoch + 1)
         return output
@@ -252,7 +252,7 @@ class PCUMAP(UMAP):
             spearman: bool = False,
             pearson: bool = True,
             epoch_to_start_correlaation_loss: int = 10,
-            umap_weight: float = 1.0/90000,
+            correlation_loss_weight: float = 90000,
             **kwargs):
         """
         Initialize PCUMAP.
@@ -267,9 +267,10 @@ class PCUMAP(UMAP):
             spearman: Whether to use Spearman correlation
             pearson: Whether to use Pearson correlation
             epoch_to_start_correlaation_loss: Epoch to start computing correlation loss
-            umap_weight: Weight of UMAP loss
+            correlation_loss_weight: Weight of correlation loss
             **kwargs: Additional arguments passed to UMAP
         """
+        
         super().__init__(**kwargs)
         self.epoch_for_comp = 0
         self.regularization_strength = regularization_strength
@@ -281,7 +282,7 @@ class PCUMAP(UMAP):
         self.spearman = spearman
         self.pearson = pearson
         self.epoch_to_start_correlaation_loss = epoch_to_start_correlaation_loss
-        self.umap_weight = umap_weight
+        self.correlation_loss_weight = correlation_loss_weight
 
     def get_reference_points(self, data: np.ndarray, Np: int) -> np.ndarray:
         """
@@ -349,14 +350,11 @@ class PCUMAP(UMAP):
             self.reshaped,
             reference_points,
             metric='euclidean')
+        
         if self.spearman:
             self.euclidean_ranks = torch.from_numpy(euclidean.argsort().argsort()).float()
-            if torch.cuda.is_available():
-                self.euclidean_ranks = self.euclidean_ranks.cuda()
         if self.pearson:
             self.euclidean = torch.from_numpy(euclidean)
-            if torch.cuda.is_available():
-                self.euclidean = self.euclidean.cuda()
 
     def _loss(self) -> torch.Tensor:
         """
@@ -365,13 +363,20 @@ class PCUMAP(UMAP):
         Returns:
             Combined loss value
         """
+
+        # Handle devices in first epoch
+        if self.epoch_for_comp == 0:
+            if self.spearman:
+                self.euclidean_ranks = self.euclidean_ranks.to(self.embedding_.device)
+            if self.pearson:
+                self.euclidean = self.euclidean.to(self.embedding_.device)
+
         self.epoch_for_comp = self.epoch_for_comp + 1
         
         umap_loss = super()._loss()
         if self.epoch_for_comp > self.epoch_to_start_correlaation_loss:
             correlation_loss = self.correlation_loss()
-            #return umap_loss * self.umap_weight + correlation_loss
-            return umap_loss + correlation_loss * 90000
+            return umap_loss + correlation_loss * self.correlation_loss_weight
         else:
             return umap_loss
 
