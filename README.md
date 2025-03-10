@@ -26,9 +26,9 @@
 
 | Image | Description |
 |-------|-------------|
-| ![Fashion MNIST](examples/gallery1) | An example on the Fashion-Mnist dataset |
+| ![Fashion MNIST](examples/gallery1.png) | An example on the Fashion-Mnist dataset |
 | ![MSI](examples/msi.png) | An application on Mass Spectometry Imaging |
-| ![Macosko single cell dataset](examples/distances.png) | An application illustarting the distance preservation on the Macosko single cell dataset |
+| ![Macosko single cell dataset](examples/distances.png) | An application illustarting the global structure preservation on the Macosko single cell dataset compared to UMAP|
 
 
 
