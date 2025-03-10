@@ -47,8 +47,8 @@ class PCC:
             num_epochs: int = 500,
             num_components: int = 2,
             beta: float = 5.0,
-            spearman: bool = True,
-            pearson: bool = False,
+            spearman: bool = False,
+            pearson: bool = True,
             k_epoch: int = 1,
             cluster: bool = True):
         """
@@ -135,7 +135,10 @@ class PCC:
         self.visualiation_to_cluster = []
         if self.cluster:
             for labels in y:
-                self.clusters.append(torch.tensor(labels).cuda())
+                label_tensor = torch.tensor(labels)
+                if torch.cuda.is_available():
+                    label_tensor = label_tensor.cuda()
+                self.clusters.append(label_tensor)
                 num_clusters = labels.max() + 1
 
                 layer = torch.nn.Sequential(
@@ -150,10 +153,10 @@ class PCC:
         self.reshaped = X
         self.resample(number_of_points=self.num_points)
         self.visualization = 10 * \
-            torch.randn(len(self.reshaped), self.num_components).cuda()
-
+            torch.randn(len(self.reshaped), self.num_components)
         if torch.cuda.is_available():
             self.visualization = self.visualization.cuda()
+
         self.visualization.requires_grad = True
         self.visualization = torch.nn.Parameter(self.visualization)
         params = [{'params': self.visualization, 'weight_decay': 0}]
@@ -178,9 +181,13 @@ class PCC:
             metric='euclidean')
         if self.spearman:
             self.euclidean_ranks = torch.from_numpy(
-                euclidean.argsort().argsort()).float().cuda()
+                euclidean.argsort().argsort()).float()
+            if torch.cuda.is_available():
+                self.euclidean_ranks = self.euclidean_ranks.cuda()
         if self.pearson:
-            self.euclidean = torch.from_numpy(euclidean).cuda()
+            self.euclidean = torch.from_numpy(euclidean)
+            if torch.cuda.is_available():
+                self.euclidean = self.euclidean.cuda()
 
     def fit_transform(self, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         """

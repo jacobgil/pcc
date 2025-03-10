@@ -9,9 +9,10 @@
 `pip install pcc`
 
 
-**This is a python package for dimensionality reduction (DR) with high global structure preservation.**
-
-**That means - the distances between transformed points, will actually mean anything.**
+⭐ This is a python package for dimensionality reduction (DR) with high global structure preservation.
+⭐ That means - the distances between transformed points, will actually mean anything.**
+⭐ Use PCUMAP for simply enhancing the widely used UMAP method with global structure preservation
+⭐ Or use it with our own PCC objective that resutls with extremely high global structure preservation, and competitive local structure
 
 
 *(For spearman correlation support, install [torchsort](https://github.com/teddykoker/torchsort) (`pip install torchsort`))*
