@@ -6,15 +6,17 @@ from typing import List, Optional, Union, Tuple
 from sklearn.metrics.pairwise import pairwise_distances
 from sklearn.cluster import KMeans, kmeans_plusplus
 
-def correlation(pred: torch.Tensor, target: torch.Tensor, dim: Optional[int] = None) -> torch.Tensor:
+
+def correlation(pred: torch.Tensor, target: torch.Tensor,
+                dim: Optional[int] = None) -> torch.Tensor:
     """
     Compute correlation between two tensors.
-    
+
     Args:
         pred: Prediction tensor
-        target: Target tensor 
+        target: Target tensor
         dim: Dimension along which to compute correlation. If None, treats tensors as 1D.
-        
+
     Returns:
         Correlation coefficient as a tensor
     """
@@ -36,7 +38,7 @@ class PCC:
     """
     Principal Component Correlation class for dimensionality reduction with correlation preservation.
     """
-    
+
     def __init__(
             self,
             num_points: int = 1000,
@@ -51,7 +53,7 @@ class PCC:
             cluster: bool = True):
         """
         Initialize PCC.
-        
+
         Args:
             number_of_points: Number of reference points to sample
             regularization_strength: Strength of soft ranking regularization
@@ -88,8 +90,8 @@ class PCC:
         Args:
             data: Data matrix of shape [N, D]
             Np: Number of reference points
-            
-        Returns:    
+
+        Returns:
             Indices of selected reference points
         """
         N = data.shape[0]
@@ -104,8 +106,13 @@ class PCC:
             return indices
 
         elif method == "kmeans":
-            kmeans = KMeans(n_clusters=Np, random_state=0, n_init="auto").fit(data)
-            return pairwise_distances(data, kmeans.cluster_centers_).argmin(axis=0)
+            kmeans = KMeans(
+                n_clusters=Np,
+                random_state=0,
+                n_init="auto").fit(data)
+            return pairwise_distances(
+                data, kmeans.cluster_centers_).argmin(
+                axis=0)
 
         elif method == "coreset":
             u = np.mean(data, axis=0)
@@ -115,10 +122,11 @@ class PCC:
             q = 0.5 * (d + 1.0 / N)
             return np.random.choice(N, Np, p=q)
 
-    def initialize_embeddings(self, X: np.ndarray, y: List[np.ndarray]) -> None:
+    def initialize_embeddings(self, X: np.ndarray,
+                              y: List[np.ndarray]) -> None:
         """
         Initialize embeddings and optimization parameters.
-        
+
         Args:
             X: Input data matrix
             labels: List of cluster labels for each layer
@@ -129,17 +137,21 @@ class PCC:
             for labels in y:
                 self.clusters.append(torch.tensor(labels).cuda())
                 num_clusters = labels.max() + 1
-                
-                layer = torch.nn.Sequential(torch.nn.Linear(self.num_components, num_clusters))
-                
+
+                layer = torch.nn.Sequential(
+                    torch.nn.Linear(
+                        self.num_components,
+                        num_clusters))
+
                 if torch.cuda.is_available():
                     layer = layer.cuda()
                 self.visualiation_to_cluster.append(layer)
 
         self.reshaped = X
         self.resample(number_of_points=self.num_points)
-        self.visualization = 10 * torch.randn(len(self.reshaped), self.num_components).cuda()
-    
+        self.visualization = 10 * \
+            torch.randn(len(self.reshaped), self.num_components).cuda()
+
         if torch.cuda.is_available():
             self.visualization = self.visualization.cuda()
         self.visualization.requires_grad = True
@@ -149,11 +161,11 @@ class PCC:
             for l in self.visualiation_to_cluster:
                 params.append({'params': l.parameters(), 'weight_decay': 0})
         self.optim = torch.optim.Adam(params, lr=1)
-        
+
     def resample(self, number_of_points: int) -> None:
         """
         Sample new reference points and compute distances.
-        
+
         Args:
             number_of_points: Number of reference points to sample
         """
@@ -165,37 +177,38 @@ class PCC:
             reference_points,
             metric='euclidean')
         if self.spearman:
-            self.euclidean_ranks = torch.from_numpy(euclidean.argsort().argsort()).float().cuda()          
+            self.euclidean_ranks = torch.from_numpy(
+                euclidean.argsort().argsort()).float().cuda()
         if self.pearson:
             self.euclidean = torch.from_numpy(euclidean).cuda()
 
     def fit_transform(self, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         """
         Fit model and transform data.
-        
+
         Args:
             X: Input data matrix
             y: List of cluster labels
-            
+
         Returns:
             Transformed data
         """
         self.initialize_embeddings(X, y)
-        
+
         for epoch in tqdm.tqdm(range(self.num_epochs)):
             output = self.compute_epoch(epoch + 1)
         return output
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self.predict(data)
-        
+
     def compute_epoch(self, epoch: int) -> np.ndarray:
         """
         Compute one optimization epoch.
-        
+
         Args:
             epoch: Current epoch number
-            
+
         Returns:
             Updated embeddings
         """
@@ -206,42 +219,46 @@ class PCC:
 
         classification_loss = 0
         if self.cluster:
-            for layer, clusters in zip(self.visualiation_to_cluster, self.clusters):
+            for layer, clusters in zip(
+                    self.visualiation_to_cluster, self.clusters):
                 o = layer(outputs)
                 cluster_loss = torch.nn.CrossEntropyLoss()(o, clusters.long())
                 loss = loss + cluster_loss
             loss = loss / len(self.clusters)
-        
+
         if (epoch % self.k_epoch == self.k_epoch - 1):
             correlation_loss = 0
             if self.spearman:
                 import torchsort
                 output_ranks = torchsort.soft_rank(
                     output_distances,
-                    regularization_strength=self.regularization_strength)        
-                correlation_loss = correlation_loss -correlation(output_ranks, self.euclidean_ranks, dim=-1).mean()
+                    regularization_strength=self.regularization_strength)
+                correlation_loss = correlation_loss - \
+                    correlation(output_ranks, self.euclidean_ranks, dim=-1).mean()
             if self.pearson:
-                correlation_loss = correlation_loss -correlation(output_distances, self.euclidean).mean()
+                correlation_loss = correlation_loss - \
+                    correlation(output_distances, self.euclidean).mean()
 
             if self.pearson and self.spearman:
                 correlation_loss = correlation_loss / 2
 
             alpha = abs(correlation_loss.detach().cpu().numpy())
             if self.cluster:
-                loss = loss  + correlation_loss * self.beta / alpha
+                loss = loss + correlation_loss * self.beta / alpha
             else:
                 loss = correlation_loss
-            
+
         self.optim.zero_grad()
         loss.backward()
         self.optim.step()
         return outputs.detach().cpu().numpy()
-    
+
+
 class PCUMAP(UMAP):
     """
     Principal Component UMAP - combines UMAP with correlation preservation.
     """
-    
+
     def __init__(
             self,
             num_points: int = 500,
@@ -256,7 +273,7 @@ class PCUMAP(UMAP):
             **kwargs):
         """
         Initialize PCUMAP.
-        
+
         Args:
             num_points: Number of reference points
             regularization_strength: Strength of soft ranking regularization
@@ -270,7 +287,7 @@ class PCUMAP(UMAP):
             correlation_loss_weight: Weight of correlation loss
             **kwargs: Additional arguments passed to UMAP
         """
-        
+
         super().__init__(**kwargs)
         self.epoch_for_comp = 0
         self.regularization_strength = regularization_strength
@@ -291,7 +308,7 @@ class PCUMAP(UMAP):
         Args:
             data: Data matrix of shape [N, D]
             Np: Number of reference points
-            
+
         Returns:
             Indices of selected reference points
         """
@@ -307,8 +324,13 @@ class PCUMAP(UMAP):
             return indices
 
         elif method == "kmeans":
-            kmeans = KMeans(n_clusters=Np, random_state=0, n_init="auto").fit(data)
-            return pairwise_distances(data, kmeans.cluster_centers_).argmin(axis=0)
+            kmeans = KMeans(
+                n_clusters=Np,
+                random_state=0,
+                n_init="auto").fit(data)
+            return pairwise_distances(
+                data, kmeans.cluster_centers_).argmin(
+                axis=0)
 
         elif method == "coreset":
             u = np.mean(data, axis=0)
@@ -329,7 +351,7 @@ class PCUMAP(UMAP):
     def initialize_embeddings(self, data: np.ndarray) -> None:
         """
         Initialize embeddings and compute reference points.
-        
+
         Args:
             data: Input data matrix
         """
@@ -339,7 +361,7 @@ class PCUMAP(UMAP):
     def resample(self, number_of_points: int) -> None:
         """
         Sample new reference points and compute distances.
-        
+
         Args:
             number_of_points: Number of reference points to sample
         """
@@ -350,16 +372,17 @@ class PCUMAP(UMAP):
             self.reshaped,
             reference_points,
             metric='euclidean')
-        
+
         if self.spearman:
-            self.euclidean_ranks = torch.from_numpy(euclidean.argsort().argsort()).float()
+            self.euclidean_ranks = torch.from_numpy(
+                euclidean.argsort().argsort()).float()
         if self.pearson:
             self.euclidean = torch.from_numpy(euclidean)
 
     def _loss(self) -> torch.Tensor:
         """
         Compute combined UMAP and correlation loss.
-        
+
         Returns:
             Combined loss value
         """
@@ -367,12 +390,13 @@ class PCUMAP(UMAP):
         # Handle devices in first epoch
         if self.epoch_for_comp == 0:
             if self.spearman:
-                self.euclidean_ranks = self.euclidean_ranks.to(self.embedding_.device)
+                self.euclidean_ranks = self.euclidean_ranks.to(
+                    self.embedding_.device)
             if self.pearson:
                 self.euclidean = self.euclidean.to(self.embedding_.device)
 
         self.epoch_for_comp = self.epoch_for_comp + 1
-        
+
         umap_loss = super()._loss()
         if self.epoch_for_comp > self.epoch_to_start_correlaation_loss:
             correlation_loss = self.correlation_loss()
@@ -383,7 +407,7 @@ class PCUMAP(UMAP):
     def correlation_loss(self) -> torch.Tensor:
         """
         Compute correlation loss between embeddings.
-        
+
         Returns:
             Correlation loss value
         """
@@ -397,9 +421,11 @@ class PCUMAP(UMAP):
             output_ranks = torchsort.soft_rank(
                 output_distances,
                 regularization_strength=self.regularization_strength)
-            correlation_loss = correlation_loss -correlation(output_ranks, self.euclidean_ranks).mean()
+            correlation_loss = correlation_loss - \
+                correlation(output_ranks, self.euclidean_ranks).mean()
         if self.pearson:
-            correlation_loss = correlation_loss -correlation(output_distances, self.euclidean).mean()
+            correlation_loss = correlation_loss - \
+                correlation(output_distances, self.euclidean).mean()
 
         if self.pearson and self.spearman:
             correlation_loss = correlation_loss / 2
