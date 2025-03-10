@@ -8,7 +8,7 @@ with open("requirements.txt", "r") as f:
     requirements = f.readlines()
 
 setuptools.setup(
-    name='pcc',
+    name='pccdr',
     version='1.0.0',
     author='Jacob Gildenblat',
     author_email='jacob.gildenblat@gmail.com',
@@ -20,7 +20,7 @@ setuptools.setup(
         'Bug Tracker': 'https://github.com/jacobgil/pcc/issues',
     },
     classifiers=[
-        'Percentile Ratioogramming Language :: Python :: 3',
+        'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
