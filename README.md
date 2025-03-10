@@ -3,10 +3,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Build Status](https://github.com/jacobgil/pcc/workflows/Tests/badge.svg)
 
+![PCC](logo.png)
+
+
 `pip install pcc`
-*(For spearman correlation support, install [torchsort](https://github.com/teddykoker/torchsort) (`pip install torchsort`))*
+
 
 This is a python package for dimensionality reduction (DR) with high global structure preservation.
+That means - the distances between transformed points, will actually mean anything.
+
+
+*(For spearman correlation support, install [torchsort](https://github.com/teddykoker/torchsort) (`pip install torchsort`))*
 
 PCC is built on the idea of sampling reference points, meausring distances of all data points from the reference points, and maximizing the correlations of these distances in the high dimensional data, and the transformed low dimensional data.
 
