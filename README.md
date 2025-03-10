@@ -11,7 +11,7 @@
 
 ⭐ This is a python package for dimensionality reduction (DR) with high global structure preservation.
 
-⭐ That means that unlike in popular DR methods like UMAP, the distances between transformed points - will actually mean anything.**
+⭐ That means that unlike in popular DR methods like UMAP, the distances between transformed points - will actually mean something.
 
 ⭐ Use PCUMAP for simply enhancing the widely used UMAP method with global structure preservation
 
@@ -62,6 +62,7 @@ for n_clusters in n_clusters_list:
 Then we can call PCC:
 
 ```python
-pcc_reducer = PCC(num_components=2, num_epochs=2000, num_points=1000, pearson=True, spearman=False, beta=5, k_epoch=2)
+pcc_reducer = PCC(num_components=2, num_epochs=2000, num_points=1000, pearson=True, 
+                  spearman=False, beta=5, k_epoch=2)
 pcc_embedding = pcc_reducer.fit_transform(X, clusters)
 ```
