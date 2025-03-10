@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Build Status](https://github.com/jacobgil/pcc/workflows/Tests/badge.svg)
 
-![PCC](logo.png | width=250)
+![PCC](logo.png)
 
 
 `pip install pcc`
