@@ -9,7 +9,10 @@
 
 `pip install pccdr`
 
-
+```python
+from pcc import PCUMAP
+pcumap_embedding = PCUMAP(device='cuda').fit_transform(X)
+```
 
 ⭐ This is a python package for dimensionality reduction (DR) with high global structure preservation.
 
@@ -22,7 +25,7 @@
 
 *(For spearman correlation support, install [torchsort](https://github.com/teddykoker/torchsort) (`pip install torchsort`))*
 
-## Example Visualizations
+## A few visual examples
 
 | Image | Description |
 |-------|-------------|
