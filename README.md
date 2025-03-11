@@ -5,7 +5,8 @@
 
 ![PCC](logo.png)
 
-(Authors: Jacob Gildenblat, Jens Pahnke)
+[PrePrint: https://arxiv.org/abs/2503.07609](https://arxiv.org/abs/2503.07609)
+Authors: Jacob Gildenblat, Jens Pahnke
 
 `pip install pccdr`
 
