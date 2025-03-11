@@ -18,9 +18,9 @@ pcumap_embedding = PCUMAP(device='cuda').fit_transform(X)
 
 ⭐ That means that unlike in popular DR methods like UMAP, the distances between transformed points - will actually mean something.
 
-⭐ Use PCUMAP for simply enhancing the widely used UMAP method with global structure preservation
+⭐ Use PCUMAP for simply enhancing the widely used UMAP method with global structure preservation.
 
-⭐ Or use it with our own PCC objective that resutls with extremely high global structure preservation, and competitive local structure
+⭐ Or use it with our own PCC objective that resutls with extremely high global structure preservation, and competitive local structure.
 
 
 *(For spearman correlation support, install [torchsort](https://github.com/teddykoker/torchsort) (`pip install torchsort`))*
