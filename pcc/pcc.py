@@ -2,7 +2,7 @@ import torch
 from torchdr import UMAP
 import numpy as np
 import tqdm
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional
 from sklearn.metrics.pairwise import pairwise_distances
 from sklearn.cluster import KMeans, kmeans_plusplus
 
@@ -223,7 +223,6 @@ class PCC:
         reference_points = outputs[self.indices]
         output_distances = torch.cdist(outputs, reference_points)
 
-        classification_loss = 0
         if self.cluster:
             for layer, clusters in zip(
                     self.visualiation_to_cluster, self.clusters):
@@ -318,7 +317,6 @@ class PCUMAP(UMAP):
             Indices of selected reference points
         """
         N = data.shape[0]
-        D = data.shape[1]
         method = self.sampling
 
         if method == "random":
