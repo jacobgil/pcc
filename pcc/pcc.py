@@ -55,11 +55,10 @@ class PCC:
         Initialize PCC.
 
         Args:
-            number_of_points: Number of reference points to sample
+            num_points: Number of reference points to sample
             regularization_strength: Strength of soft ranking regularization
             sampling: Method for sampling reference points ("random", "kmeans++", "kmeans", "coreset")
             num_epochs: Number of optimization epochs
-            init: Initialization method or array
             num_components: Number of output dimensions
             beta: Weight of correlation loss
             spearman: Whether to use Spearman correlation
@@ -81,7 +80,7 @@ class PCC:
 
     def __repr__(self) -> str:
         return f"Saliency PCC: num_epochs: {self.num_epochs} regularization_strength: {self.regularization_strength} \
-            sampling: {self.sampling} number_of_points:{self.num_points} pearson: {self.pearson} spearman: {self.spearman}"
+            sampling: {self.sampling} num_points:{self.num_points} pearson: {self.pearson} spearman: {self.spearman}"
 
     def get_reference_points(self, data: np.ndarray, Np: int) -> np.ndarray:
         """
@@ -129,7 +128,7 @@ class PCC:
 
         Args:
             X: Input data matrix
-            labels: List of cluster labels for each layer
+            y: List of cluster labels for each layer
         """
         self.clusters = []
         self.visualiation_to_cluster = []
@@ -275,22 +274,21 @@ class PCUMAP(UMAP):
             beta: float = 10.0,
             spearman: bool = False,
             pearson: bool = True,
-            epoch_to_start_correlaation_loss: int = 10,
+            epoch_to_start_correlation_loss: int = 10,
             correlation_loss_weight: float = 90000,
             **kwargs):
         """
         Initialize PCUMAP.
 
         Args:
-            num_points: Number of reference points
+            num_points: Number of reference points to sample
             regularization_strength: Strength of soft ranking regularization
-            sampling: Method for sampling reference points
-            num_epochs: Number of optimization epochs
+            sampling: Method for sampling reference points ("random", "kmeans++", "kmeans", "coreset")
             num_components: Number of output dimensions
             beta: Weight of correlation loss
             spearman: Whether to use Spearman correlation
             pearson: Whether to use Pearson correlation
-            epoch_to_start_correlaation_loss: Epoch to start computing correlation loss
+            epoch_to_start_correlation_loss: Epoch to start computing correlation loss
             correlation_loss_weight: Weight of correlation loss
             **kwargs: Additional arguments passed to UMAP
         """
@@ -305,7 +303,7 @@ class PCUMAP(UMAP):
         self.beta = beta
         self.spearman = spearman
         self.pearson = pearson
-        self.epoch_to_start_correlaation_loss = epoch_to_start_correlaation_loss
+        self.epoch_to_start_correlation_loss = epoch_to_start_correlation_loss
         self.correlation_loss_weight = correlation_loss_weight
 
     def get_reference_points(self, data: np.ndarray, Np: int) -> np.ndarray:
@@ -405,7 +403,7 @@ class PCUMAP(UMAP):
         self.epoch_for_comp = self.epoch_for_comp + 1
 
         umap_loss = super()._loss()
-        if self.epoch_for_comp > self.epoch_to_start_correlaation_loss:
+        if self.epoch_for_comp > self.epoch_to_start_correlation_loss:
             correlation_loss = self.correlation_loss()
             return umap_loss + correlation_loss * self.correlation_loss_weight
         else:
