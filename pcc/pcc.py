@@ -45,7 +45,7 @@ class PCC:
             regularization_strength: float = 0.005,
             sampling: str = "random",
             num_epochs: int = 500,
-            num_components: int = 2,
+            n_components: int = 2,
             beta: float = 5.0,
             spearman: bool = False,
             pearson: bool = True,
@@ -59,7 +59,7 @@ class PCC:
             regularization_strength: Strength of soft ranking regularization
             sampling: Method for sampling reference points ("random", "kmeans++", "kmeans", "coreset")
             num_epochs: Number of optimization epochs
-            num_components: Number of output dimensions
+            n_components: Number of output dimensions
             beta: Weight of correlation loss
             spearman: Whether to use Spearman correlation
             pearson: Whether to use Pearson correlation
@@ -70,7 +70,7 @@ class PCC:
         self.regularization_strength = regularization_strength
         self.sampling = sampling
         self.num_points = num_points
-        self.num_components = num_components
+        self.n_components = n_components
         self.clusters = None
         self.beta = beta
         self.spearman = spearman
@@ -142,17 +142,17 @@ class PCC:
 
                 layer = torch.nn.Sequential(
                     torch.nn.Linear(
-                        self.num_components,
+                        self.n_components,
                         num_clusters))
 
                 if torch.cuda.is_available():
                     layer = layer.cuda()
                 self.visualiation_to_cluster.append(layer)
 
-        self.reshaped = X
+        self.data = X
         self.resample(number_of_points=self.num_points)
         self.visualization = 10 * \
-            torch.randn(len(self.reshaped), self.num_components)
+            torch.randn(len(self.data), self.n_components)
         if torch.cuda.is_available():
             self.visualization = self.visualization.cuda()
 
@@ -172,10 +172,10 @@ class PCC:
             number_of_points: Number of reference points to sample
         """
         self.indices = self.get_reference_points(
-            self.reshaped, number_of_points)
-        reference_points = self.reshaped[self.indices, :]
+            self.data, number_of_points)
+        reference_points = self.data[self.indices, :]
         euclidean = pairwise_distances(
-            self.reshaped,
+            self.data,
             reference_points,
             metric='euclidean')
         if self.spearman:
@@ -269,7 +269,7 @@ class PCUMAP(UMAP):
             num_points: int = 500,
             regularization_strength: float = 0.005,
             sampling: str = "random",
-            num_components: int = 2,
+            n_components: int = 2,
             beta: float = 10.0,
             spearman: bool = False,
             pearson: bool = True,
@@ -283,7 +283,7 @@ class PCUMAP(UMAP):
             num_points: Number of reference points to sample
             regularization_strength: Strength of soft ranking regularization
             sampling: Method for sampling reference points ("random", "kmeans++", "kmeans", "coreset")
-            num_components: Number of output dimensions
+            n_components: Number of output dimensions
             beta: Weight of correlation loss
             spearman: Whether to use Spearman correlation
             pearson: Whether to use Pearson correlation
@@ -297,7 +297,7 @@ class PCUMAP(UMAP):
         self.regularization_strength = regularization_strength
         self.sampling = sampling
         self.num_points = num_points
-        self.num_components = num_components
+        self.n_components = n_components
         self.clusters = None
         self.beta = beta
         self.spearman = spearman
@@ -349,6 +349,7 @@ class PCUMAP(UMAP):
 
     def fit_transform(self, X: np.ndarray, **kwargs) -> np.ndarray:
         self.initialize_embeddings(X)
+        print("got embeddings")
         return super().fit_transform(X, **kwargs)
 
     def initialize_embeddings(self, data: np.ndarray) -> None:
@@ -358,7 +359,7 @@ class PCUMAP(UMAP):
         Args:
             data: Input data matrix
         """
-        self.reshaped = data
+        self.data = data
         self.resample(number_of_points=self.num_points)
 
     def resample(self, number_of_points: int) -> None:
@@ -369,10 +370,10 @@ class PCUMAP(UMAP):
             number_of_points: Number of reference points to sample
         """
         self.indices = self.get_reference_points(
-            self.reshaped, number_of_points)
-        reference_points = self.reshaped[self.indices, :]
+            self.data, number_of_points)
+        reference_points = self.data[self.indices, :]
         euclidean = pairwise_distances(
-            self.reshaped,
+            self.data,
             reference_points,
             metric='euclidean')
 

@@ -16,13 +16,13 @@ def blob_data():
 
 def test_pcc_basic(synthetic_data):
     X, clusters = synthetic_data
-    pcc = PCC(num_components=2, num_epochs=10)
+    pcc = PCC(n_components=2, num_epochs=10)
     embedding = pcc.fit_transform(X, clusters)
     assert embedding.shape == (100, 2)
 
 def test_pcc_parameters(synthetic_data):
     X, clusters = synthetic_data
-    pcc = PCC(num_components=3,
+    pcc = PCC(n_components=3,
               num_epochs=3, 
               num_points=10,
               pearson=True,
@@ -33,7 +33,7 @@ def test_pcc_parameters(synthetic_data):
 
 def test_pcc_no_clusters(synthetic_data):
     X, _ = synthetic_data
-    pcc = PCC(num_components=2,
+    pcc = PCC(n_components=2,
               num_epochs=10,
               cluster=False)
     embedding = pcc.fit_transform(X, None)
