@@ -9,7 +9,7 @@ with open("requirements.txt", "r") as f:
 
 setuptools.setup(
     name='pccdr',
-    version='1.0.2',
+    version='1.0.3',
     author='Jacob Gildenblat',
     author_email='jacob.gildenblat@gmail.com',
     description='Dimensionality reduction by preserving clusters and correlations.',

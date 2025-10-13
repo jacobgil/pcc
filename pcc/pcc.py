@@ -1,14 +1,16 @@
-import torch
-from torchdr import UMAP
-import numpy as np
-import tqdm
+import random
 from typing import List, Optional
+
+import numpy as np
+import torch
+import tqdm
 from sklearn.metrics.pairwise import pairwise_distances
-from sklearn.cluster import KMeans, kmeans_plusplus
+from torchdr import UMAP
 
 
-def correlation(pred: torch.Tensor, target: torch.Tensor,
-                dim: Optional[int] = None) -> torch.Tensor:
+def correlation(
+    pred: torch.Tensor, target: torch.Tensor, dim: Optional[int] = None
+) -> torch.Tensor:
     """
     Compute correlation between two tensors.
 
@@ -40,51 +42,59 @@ class PCC:
     """
 
     def __init__(
-            self,
-            num_points: int = 1000,
-            regularization_strength: float = 0.005,
-            sampling: str = "random",
-            num_epochs: int = 500,
-            n_components: int = 2,
-            beta: float = 5.0,
-            spearman: bool = False,
-            pearson: bool = True,
-            k_epoch: int = 1,
-            cluster: bool = True):
+        self,
+        num_points: int = 1000,
+        num_epochs: int = 500,
+        n_components: int = 2,
+        beta: float = 5.0,
+        k_epoch: int = 1,
+        cluster: bool = True,
+        batch_size=4096 * 2,
+        temperature: float = 10.0,
+        landmarks=None,
+        random_state=42,
+    ):
         """
         Initialize PCC.
 
         Args:
             num_points: Number of reference points to sample
-            regularization_strength: Strength of soft ranking regularization
-            sampling: Method for sampling reference points ("random", "kmeans++", "kmeans", "coreset")
             num_epochs: Number of optimization epochs
             n_components: Number of output dimensions
             beta: Weight of correlation loss
-            spearman: Whether to use Spearman correlation
-            pearson: Whether to use Pearson correlation
             k_epoch: Frequency of correlation loss computation
             cluster: Whether to use clustering
         """
         self.num_epochs = num_epochs
-        self.regularization_strength = regularization_strength
-        self.sampling = sampling
         self.num_points = num_points
         self.n_components = n_components
         self.clusters = None
         self.beta = beta
-        self.spearman = spearman
-        self.pearson = pearson
         self.k_epoch = k_epoch
         self.cluster = cluster
+        self.batch_size = batch_size
+        self.temperature = temperature
+        self.indices = landmarks
+        self.random_state = random_state
 
-    def __repr__(self) -> str:
-        return f"Saliency PCC: num_epochs: {self.num_epochs} regularization_strength: {self.regularization_strength} \
-            sampling: {self.sampling} num_points:{self.num_points} pearson: {self.pearson} spearman: {self.spearman}"
+        self.seed_everything()
+
+    def seed_everything(self):
+        """
+        Set random seeds for reproducibility.
+        """
+        np.random.seed(self.random_state)
+        random.seed(self.random_state)
+        torch.manual_seed(self.random_state)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(self.random_state)
+            torch.cuda.manual_seed_all(self.random_state)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
 
     def get_reference_points(self, data: np.ndarray, Np: int) -> np.ndarray:
         """
-        Reduces (NxD) data matrix from N to Np data points.
+        Reduces (NxD) data matrix from N to Np data points using random sampling.
 
         Args:
             data: Data matrix of shape [N, D]
@@ -94,35 +104,10 @@ class PCC:
             Indices of selected reference points
         """
         N = data.shape[0]
-        D = data.shape[1]
-        method = self.sampling
+        rng = np.random.RandomState(self.random_state)
+        return rng.choice(list(range(N)), Np)
 
-        if method == "random":
-            return np.random.choice(list(range(N)), Np)
-
-        elif method == "kmeans++":
-            _, indices = kmeans_plusplus(data, n_clusters=Np, random_state=0)
-            return indices
-
-        elif method == "kmeans":
-            kmeans = KMeans(
-                n_clusters=Np,
-                random_state=0,
-                n_init="auto").fit(data)
-            return pairwise_distances(
-                data, kmeans.cluster_centers_).argmin(
-                axis=0)
-
-        elif method == "coreset":
-            u = np.mean(data, axis=0)
-            q = np.linalg.norm(data - u, axis=1)**2
-            sum = np.sum(q)
-            d = q / sum
-            q = 0.5 * (d + 1.0 / N)
-            return np.random.choice(N, Np, p=q)
-
-    def initialize_embeddings(self, X: np.ndarray,
-                              y: List[np.ndarray]) -> None:
+    def initialize_embeddings(self, X: np.ndarray, y: List[np.ndarray]) -> None:
         """
         Initialize embeddings and optimization parameters.
 
@@ -132,6 +117,7 @@ class PCC:
         """
         self.clusters = []
         self.visualiation_to_cluster = []
+
         if self.cluster:
             for labels in y:
                 label_tensor = torch.tensor(labels)
@@ -141,9 +127,8 @@ class PCC:
                 num_clusters = labels.max() + 1
 
                 layer = torch.nn.Sequential(
-                    torch.nn.Linear(
-                        self.n_components,
-                        num_clusters))
+                    torch.nn.Linear(self.n_components, num_clusters)
+                )
 
                 if torch.cuda.is_available():
                     layer = layer.cuda()
@@ -151,17 +136,18 @@ class PCC:
 
         self.data = X
         self.resample(number_of_points=self.num_points)
-        self.visualization = 10 * \
-            torch.randn(len(self.data), self.n_components)
+
+        self.visualization = 10 * torch.randn(len(self.data), self.n_components)
         if torch.cuda.is_available():
             self.visualization = self.visualization.cuda()
 
         self.visualization.requires_grad = True
         self.visualization = torch.nn.Parameter(self.visualization)
-        params = [{'params': self.visualization, 'weight_decay': 0}]
+        params = [{"params": self.visualization, "weight_decay": 0}]
         if self.cluster:
-            for l in self.visualiation_to_cluster:
-                params.append({'params': l.parameters(), 'weight_decay': 0})
+            for layer in self.visualiation_to_cluster:
+                params.append({"params": layer.parameters(), "weight_decay": 0})
+
         self.optim = torch.optim.Adam(params, lr=1)
 
     def resample(self, number_of_points: int) -> None:
@@ -171,22 +157,14 @@ class PCC:
         Args:
             number_of_points: Number of reference points to sample
         """
-        self.indices = self.get_reference_points(
-            self.data, number_of_points)
+
+        if self.indices is None:
+            self.indices = self.get_reference_points(self.data, number_of_points)
         reference_points = self.data[self.indices, :]
-        euclidean = pairwise_distances(
-            self.data,
-            reference_points,
-            metric='euclidean')
-        if self.spearman:
-            self.euclidean_ranks = torch.from_numpy(
-                euclidean.argsort().argsort()).float()
-            if torch.cuda.is_available():
-                self.euclidean_ranks = self.euclidean_ranks.cuda()
-        if self.pearson:
-            self.euclidean = torch.from_numpy(euclidean)
-            if torch.cuda.is_available():
-                self.euclidean = self.euclidean.cuda()
+        euclidean = pairwise_distances(self.data, reference_points, metric="euclidean")
+        self.euclidean = torch.from_numpy(euclidean)
+        if torch.cuda.is_available():
+            self.euclidean = self.euclidean.cuda()
 
     def fit_transform(self, X: np.ndarray, y: np.ndarray) -> np.ndarray:
         """
@@ -199,6 +177,7 @@ class PCC:
         Returns:
             Transformed data
         """
+
         self.initialize_embeddings(X, y)
 
         for epoch in tqdm.tqdm(range(self.num_epochs)):
@@ -210,7 +189,7 @@ class PCC:
 
     def compute_epoch(self, epoch: int) -> np.ndarray:
         """
-        Compute one optimization epoch.
+        Compute one optimization epoch using mini-batches.
 
         Args:
             epoch: Current epoch number
@@ -218,44 +197,70 @@ class PCC:
         Returns:
             Updated embeddings
         """
+
         outputs = self.visualization
-        loss = 0
-        reference_points = outputs[self.indices]
-        output_distances = torch.cdist(outputs, reference_points)
+        batch_size = self.batch_size
+        n_samples = outputs.shape[0]
 
-        if self.cluster:
-            for layer, clusters in zip(
-                    self.visualiation_to_cluster, self.clusters):
-                o = layer(outputs)
-                cluster_loss = torch.nn.CrossEntropyLoss()(o, clusters.long())
-                loss = loss + cluster_loss
-            loss = loss / len(self.clusters)
+        # Shuffle indices for random batching
+        batch_indices = torch.randperm(n_samples)
 
-        if (epoch % self.k_epoch == self.k_epoch - 1):
-            correlation_loss = 0
-            if self.spearman:
-                import torchsort
-                output_ranks = torchsort.soft_rank(
-                    output_distances,
-                    regularization_strength=self.regularization_strength)
-                correlation_loss = correlation_loss - \
-                    correlation(output_ranks, self.euclidean_ranks, dim=-1).mean()
-            if self.pearson:
-                correlation_loss = correlation_loss - \
-                    correlation(output_distances, self.euclidean).mean()
+        num_batches = (n_samples + batch_size - 1) // batch_size
 
-            if self.pearson and self.spearman:
-                correlation_loss = correlation_loss / 2
+        for batch_idx in range(num_batches):
+            start_idx = batch_idx * batch_size
+            end_idx = min((batch_idx + 1) * batch_size, n_samples)
+            batch_mask = batch_indices[start_idx:end_idx]
 
-            alpha = abs(correlation_loss.detach().cpu().numpy())
+            batch_outputs = outputs[batch_mask]
+            loss = 0
+
+            # Get reference points for this batch
+
+            batch_reference_points = outputs[self.indices]
+            low_d_distances = torch.cdist(batch_outputs, batch_reference_points)
+
+            high_d_distances = self.euclidean[batch_mask]
+
             if self.cluster:
-                loss = loss + correlation_loss * self.beta / alpha
-            else:
-                loss = correlation_loss
+                for i in range(len(self.clusters)):
+                    layer = self.visualiation_to_cluster[i]
+                    clusters = self.clusters[i]
+                    batch_clusters = clusters[batch_mask]
+                    cluster_loss = torch.nn.CrossEntropyLoss()(
+                        layer(batch_outputs) / self.temperature, batch_clusters.long()
+                    )
+                    loss = loss + cluster_loss
+                loss = loss / len(self.clusters)
 
-        self.optim.zero_grad()
-        loss.backward()
-        self.optim.step()
+            if epoch % self.k_epoch == self.k_epoch - 1:
+                correlation_loss = 0
+
+                high_d_distances = self.euclidean[batch_mask]
+                correlation_loss = (
+                    correlation_loss
+                    - correlation(low_d_distances, high_d_distances).mean()
+                )
+
+                if correlation_loss > 0:
+                    print(f"Correlation loss is positive: {correlation_loss}")
+
+                alpha = -float(correlation_loss.detach().cpu().numpy())
+                alpha = max(alpha, 1e-6)
+
+                if self.cluster:
+                    loss = loss + correlation_loss * self.beta / alpha
+                else:
+                    loss = correlation_loss
+
+            self.optim.zero_grad()
+            loss.backward()
+            self.optim.step()
+
+        if epoch % self.k_epoch == self.k_epoch - 1:
+            # Linearly reduce k_epoch to 1 after 90% of epochs
+            self.k_epoch = max(1, int(self.k_epoch * 0.92))
+
         return outputs.detach().cpu().numpy()
 
 
@@ -265,28 +270,21 @@ class PCUMAP(UMAP):
     """
 
     def __init__(
-            self,
-            num_points: int = 500,
-            regularization_strength: float = 0.005,
-            sampling: str = "random",
-            n_components: int = 2,
-            beta: float = 10.0,
-            spearman: bool = False,
-            pearson: bool = True,
-            epoch_to_start_correlation_loss: int = 10,
-            correlation_loss_weight: float = 90000,
-            **kwargs):
+        self,
+        num_points: int = 1000,
+        n_components: int = 2,
+        epoch_to_start_correlation_loss: int = 10,
+        correlation_loss_weight: float = 90000,
+        lmc_batch_size: int = 4096 * 2 * 2 * 2 * 2,
+        random_state=42,
+        **kwargs,
+    ):
         """
         Initialize PCUMAP.
 
         Args:
             num_points: Number of reference points to sample
-            regularization_strength: Strength of soft ranking regularization
-            sampling: Method for sampling reference points ("random", "kmeans++", "kmeans", "coreset")
             n_components: Number of output dimensions
-            beta: Weight of correlation loss
-            spearman: Whether to use Spearman correlation
-            pearson: Whether to use Pearson correlation
             epoch_to_start_correlation_loss: Epoch to start computing correlation loss
             correlation_loss_weight: Weight of correlation loss
             **kwargs: Additional arguments passed to UMAP
@@ -294,20 +292,16 @@ class PCUMAP(UMAP):
 
         super().__init__(**kwargs)
         self.epoch_for_comp = 0
-        self.regularization_strength = regularization_strength
-        self.sampling = sampling
         self.num_points = num_points
         self.n_components = n_components
         self.clusters = None
-        self.beta = beta
-        self.spearman = spearman
-        self.pearson = pearson
         self.epoch_to_start_correlation_loss = epoch_to_start_correlation_loss
         self.correlation_loss_weight = correlation_loss_weight
+        self.lmc_batch_size = lmc_batch_size
 
     def get_reference_points(self, data: np.ndarray, Np: int) -> np.ndarray:
         """
-        Reduces (NxD) data matrix from N to Np data points.
+        Reduces (NxD) data matrix from N to Np data points using random sampling.
 
         Args:
             data: Data matrix of shape [N, D]
@@ -317,39 +311,15 @@ class PCUMAP(UMAP):
             Indices of selected reference points
         """
         N = data.shape[0]
-        method = self.sampling
+        rng = np.random.RandomState(self.random_state)
+        return rng.choice(list(range(N)), Np)
 
-        if method == "random":
-            return np.random.choice(list(range(N)), self.num_points)
-
-        elif method == "kmeans++":
-            _, indices = kmeans_plusplus(data, n_clusters=Np, random_state=0)
-            return indices
-
-        elif method == "kmeans":
-            kmeans = KMeans(
-                n_clusters=Np,
-                random_state=0,
-                n_init="auto").fit(data)
-            return pairwise_distances(
-                data, kmeans.cluster_centers_).argmin(
-                axis=0)
-
-        elif method == "coreset":
-            u = np.mean(data, axis=0)
-            q = np.linalg.norm(data - u, axis=1)**2
-            sum = np.sum(q)
-            d = q / sum
-            q = 0.5 * (d + 1.0 / N)
-            return np.random.choice(N, Np, p=q)
-
-    def fit(self, X: np.ndarray, **kwargs) -> 'PCUMAP':
+    def fit(self, X: np.ndarray, **kwargs) -> "PCUMAP":
         self.initialize_embeddings(X)
         return super().fit(X, **kwargs)
 
     def fit_transform(self, X: np.ndarray, **kwargs) -> np.ndarray:
         self.initialize_embeddings(X)
-        print("got embeddings")
         return super().fit_transform(X, **kwargs)
 
     def initialize_embeddings(self, data: np.ndarray) -> None:
@@ -369,19 +339,11 @@ class PCUMAP(UMAP):
         Args:
             number_of_points: Number of reference points to sample
         """
-        self.indices = self.get_reference_points(
-            self.data, number_of_points)
+        self.indices = self.get_reference_points(self.data, number_of_points)
         reference_points = self.data[self.indices, :]
-        euclidean = pairwise_distances(
-            self.data,
-            reference_points,
-            metric='euclidean')
+        euclidean = pairwise_distances(self.data, reference_points, metric="euclidean")
 
-        if self.spearman:
-            self.euclidean_ranks = torch.from_numpy(
-                euclidean.argsort().argsort()).float()
-        if self.pearson:
-            self.euclidean = torch.from_numpy(euclidean)
+        self.euclidean = torch.from_numpy(euclidean)
 
     def _loss(self) -> torch.Tensor:
         """
@@ -391,20 +353,14 @@ class PCUMAP(UMAP):
             Combined loss value
         """
 
-        # Handle devices in first epoch
-        if self.epoch_for_comp == 0:
-            if self.spearman:
-                self.euclidean_ranks = self.euclidean_ranks.to(
-                    self.embedding_.device)
-            if self.pearson:
-                self.euclidean = self.euclidean.to(self.embedding_.device)
-
         self.epoch_for_comp = self.epoch_for_comp + 1
 
         umap_loss = super()._loss()
         if self.epoch_for_comp > self.epoch_to_start_correlation_loss:
             correlation_loss = self.correlation_loss()
-            return umap_loss + correlation_loss * self.correlation_loss_weight
+            alpha = -float(correlation_loss.detach().cpu().numpy())
+            alpha = max(alpha, 1e-6)
+            return umap_loss + correlation_loss * self.correlation_loss_weight / alpha
         else:
             return umap_loss
 
@@ -417,21 +373,28 @@ class PCUMAP(UMAP):
         """
         outputs = self.embedding_
         reference_points = outputs[self.indices]
-        output_distances = torch.cdist(outputs, reference_points)
 
         correlation_loss = 0
-        if self.spearman:
-            import torchsort
-            output_ranks = torchsort.soft_rank(
-                output_distances,
-                regularization_strength=self.regularization_strength)
-            correlation_loss = correlation_loss - \
-                correlation(output_ranks, self.euclidean_ranks).mean()
-        if self.pearson:
-            correlation_loss = correlation_loss - \
-                correlation(output_distances, self.euclidean).mean()
+        # Process in batches if data is larger than batch size
+        if len(outputs) > self.lmc_batch_size:
+            batch_losses = []
+            for i in range(0, len(outputs), self.lmc_batch_size):
+                batch_outputs = outputs[i : i + self.lmc_batch_size]
+                batch_distances = torch.cdist(batch_outputs, reference_points)
+                batch_euclidean = self.euclidean[i : i + self.lmc_batch_size]
+                batch_euclidean = batch_euclidean.to(self.embedding_.device)
+                batch_loss = correlation(batch_distances, batch_euclidean).mean()
+                batch_losses.append(batch_loss)
+            correlation_loss = correlation_loss - torch.stack(batch_losses).mean()
+        else:
+            # Handle devices in first epoch
+            if self.epoch_for_comp == 0:
+                self.euclidean = self.euclidean.to(self.embedding_.device)
 
-        if self.pearson and self.spearman:
-            correlation_loss = correlation_loss / 2
+            # Process all at once if data fits in batch
+            output_distances = torch.cdist(outputs, reference_points)
+            correlation_loss = (
+                correlation_loss - correlation(output_distances, self.euclidean).mean()
+            )
 
         return correlation_loss
