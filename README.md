@@ -28,9 +28,13 @@ pcumap_embedding = PCUMAP(device='cuda').fit_transform(X)
 ⭐ Use MiCS + LMC objective for extremely high global structure preservation, and competitive local structure.
 
 
-*(For spearman correlation support, install [torchsort](https://github.com/teddykoker/torchsort) (`pip install torchsort`))*
 
 ## A few visual examples
+
+![Mammoth](examples/global.jpg)
+
+
+
 
 | Image | Description |
 |-------|-------------|
@@ -86,4 +90,5 @@ pcc_reducer = PCC(n_components=2, num_epochs=2000, num_points=1000, pearson=True
                   spearman=False, beta=5, k_epoch=2)
 pcc_embedding = pcc_reducer.fit_transform(X, clusters)
 ```
+
 
