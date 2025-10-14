@@ -1,4 +1,4 @@
-# PCC - Dimensionality reduction with very high global structure preservation
+Dimensionality reduction with very high global structure preservation
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Build Status](https://github.com/jacobgil/pcc/workflows/Tests/badge.svg)
@@ -19,9 +19,13 @@ pcumap_embedding = PCUMAP(device='cuda').fit_transform(X)
 
 ⭐ That means that unlike in popular DR methods like UMAP, the distances between transformed points - will actually mean something.
 
-⭐ Use PCUMAP for simply enhancing the widely used UMAP method with global structure preservation.
+⭐ Implementes the Landmark Mantel Correlation (LMC) Objective that maximizes the correlation of distances of all points from landmarks in the high and low dimensional data.
 
-⭐ Or use it with our own PCC objective that resutls with extremely high global structure preservation, and competitive local structure.
+⭐ Use UMAP + LMC Objective for simply enhancing the widely used UMAP method with global structure preservation.
+
+⭐ Implementes the Multi resolution Clustering Supervistion (MiCS) objective that creates a dimensionality reduction where multiple clusters are predictable.
+
+⭐ Use MiCS + LMC objective for extremely high global structure preservation, and competitive local structure.
 
 
 *(For spearman correlation support, install [torchsort](https://github.com/teddykoker/torchsort) (`pip install torchsort`))*
@@ -45,7 +49,7 @@ See examples/macosko.ipynb for more detailed explanation and usage examples.
 
 There are two modes:
 
-## Plugging into UMAP, for getting a meaningful transformation where distances between points mean something
+## Plugging Landmark Mantel Correlation UMAP, for getting a meaningful transformation where distances between points mean something
 
 Here we use the excellent recent [TorchDR](https://github.com/TorchDR/TorchDR) library, and add plug in our objective into UMAP.
 
@@ -55,7 +59,7 @@ pcumap_embedding = PCUMAP(device='cuda', n_components=2).fit_transform(X)
 ```
 
 
-## PCC as a standalone DR method with a multi task objective
+## MiCS + LMC as a standalone DR method with a multi task objective
 
 This optimizes a local structure preservation multi task objective that tries to predict which clusters points belong to,
 as well as global structure preservation loss that maximizes corerlations between distances of all points to sampled reference points.
@@ -82,3 +86,4 @@ pcc_reducer = PCC(n_components=2, num_epochs=2000, num_points=1000, pearson=True
                   spearman=False, beta=5, k_epoch=2)
 pcc_embedding = pcc_reducer.fit_transform(X, clusters)
 ```
+
