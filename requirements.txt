@@ -2,3 +2,4 @@ torchdr>=0.2
 numpy>=1.24
 scikit-learn>=1.3.2
 matplotlib
+tqdm
