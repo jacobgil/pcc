@@ -383,39 +383,76 @@ class PCUMAP(UMAP):
         if self.pearson:
             self.euclidean = torch.from_numpy(euclidean)
 
+    def _correlation_step(self) -> bool:
+        """
+        Advance the iteration counter, move the reference distances to the
+        embedding's device, and tell whether the correlation term is active.
+
+        Returns:
+            True if the correlation loss should be applied in this iteration
+        """
+        device = self.embedding_.device
+        if self.spearman and self.euclidean_ranks.device != device:
+            self.euclidean_ranks = self.euclidean_ranks.to(device)
+        if self.pearson and self.euclidean.device != device:
+            self.euclidean = self.euclidean.to(device)
+
+        self.epoch_for_comp = self.epoch_for_comp + 1
+        return self.epoch_for_comp > self.epoch_to_start_correlation_loss
+
     def _loss(self) -> torch.Tensor:
         """
-        Compute combined UMAP and correlation loss.
+        Compute combined UMAP and correlation loss (torchdr < 0.3, autograd).
 
         Returns:
             Combined loss value
         """
-
-        # Handle devices in first epoch
-        if self.epoch_for_comp == 0:
-            if self.spearman:
-                self.euclidean_ranks = self.euclidean_ranks.to(
-                    self.embedding_.device)
-            if self.pearson:
-                self.euclidean = self.euclidean.to(self.embedding_.device)
-
-        self.epoch_for_comp = self.epoch_for_comp + 1
-
+        use_correlation = self._correlation_step()
         umap_loss = super()._loss()
-        if self.epoch_for_comp > self.epoch_to_start_correlation_loss:
+        if use_correlation:
             correlation_loss = self.correlation_loss()
             return umap_loss + correlation_loss * self.correlation_loss_weight
         else:
             return umap_loss
 
-    def correlation_loss(self) -> torch.Tensor:
+    def _compute_gradients(self) -> torch.Tensor:
+        """
+        Add the correlation gradient to UMAP's closed-form gradients.
+
+        From torchdr 0.3 on, UMAP no longer builds a loss for autograd: it
+        computes its gradients in closed form in ``_compute_gradients``, so
+        ``_loss`` is never called and the correlation term would be silently
+        dropped. Here the correlation loss is differentiated with autograd and
+        added to the UMAP gradients of the points this process updates.
+
+        Returns:
+            Gradients w.r.t. the embedding rows in ``chunk_indices_``
+        """
+        gradients = super()._compute_gradients()
+        if gradients is None or not self._correlation_step():
+            return gradients
+
+        with torch.enable_grad():
+            embedding = self.embedding_.detach().requires_grad_(True)
+            loss = self.correlation_loss(embedding) * self.correlation_loss_weight
+            (correlation_gradients,) = torch.autograd.grad(loss, embedding)
+
+        chunk_indices = getattr(self, "chunk_indices_", None)
+        if chunk_indices is not None:
+            correlation_gradients = correlation_gradients[chunk_indices]
+        return gradients + correlation_gradients.to(gradients.dtype)
+
+    def correlation_loss(self, embedding: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
         Compute correlation loss between embeddings.
+
+        Args:
+            embedding: Embedding to evaluate; defaults to ``self.embedding_``
 
         Returns:
             Correlation loss value
         """
-        outputs = self.embedding_
+        outputs = self.embedding_ if embedding is None else embedding
         reference_points = outputs[self.indices]
         output_distances = torch.cdist(outputs, reference_points)
 

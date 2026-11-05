@@ -40,7 +40,8 @@ def test_pcc_no_clusters(synthetic_data):
     assert embedding.shape == (100, 2)
 
 def test_pcumap_basic(blob_data):
-    pcumap = PCUMAP(n_components=2)
+    # backend=None: torchdr >= 0.4 defaults to the faiss backend, which is not a dependency
+    pcumap = PCUMAP(n_components=2, backend=None)
     embedding = pcumap.fit_transform(blob_data)
     assert embedding.shape == (100, 2)
 
@@ -50,3 +51,21 @@ def test_reference_point_sampling(blob_data):
     indices = pcumap.get_reference_points(blob_data, 50)
     assert len(indices) == 50
     assert all(i < len(blob_data) for i in indices)
+
+
+def test_pcumap_applies_correlation_loss(blob_data, monkeypatch):
+    # torchdr >= 0.3 computes UMAP gradients in closed form and never calls
+    # _loss, so the correlation term has to be hooked in elsewhere.
+    calls = []
+    original = PCUMAP.correlation_loss
+
+    def spy(self, *args, **kwargs):
+        calls.append(1)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(PCUMAP, "correlation_loss", spy)
+    pcumap = PCUMAP(n_components=2, num_points=50, max_iter=30,
+                    epoch_to_start_correlation_loss=10, device="cpu", backend=None)
+    embedding = pcumap.fit_transform(blob_data)
+    assert embedding.shape == (100, 2)
+    assert len(calls) > 0
